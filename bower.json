@@ -1,0 +1,13 @@
+{
+  "name": "node-tweet-vr",
+  "version": "0.0.1",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "components"
+  ],
+  "dependencies": {
+    "three.js": "~0.70.0",
+    "jquery": "~2.1.3"
+  }
+}
