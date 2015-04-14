@@ -44,7 +44,7 @@ function init() {
     renderer.domElement.style.position = 'absolute';
 
     // container that fullscreen will be called on.
-    container = document.getElementById('vrPeriodictable');
+    container = document.getElementById('vrContainer');
     container.appendChild(renderer.domElement);
 
     // for VR
