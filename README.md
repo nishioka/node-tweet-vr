@@ -1,4 +1,4 @@
-# VR tweet viewer for Firefox VR
+# Tweet viewer for Firefox VR
 
 ![Screen Shot](https://github.com/nishioka/node-tweet-vr/raw/master/public/img/ss.png "Screen Shot")
 
