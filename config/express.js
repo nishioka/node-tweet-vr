@@ -8,54 +8,69 @@ var bodyParser = require('body-parser');
 var compress = require('compression');
 var methodOverride = require('method-override');
 
-module.exports = function(app, config) {
-  app.set('views', config.root + '/app/views');
-  app.set('view engine', 'ejs');
+var passport = require('passport');
+var session = require('express-session');
 
-  var env = process.env.NODE_ENV || 'development';
-  app.locals.ENV = env;
-  app.locals.ENV_DEVELOPMENT = env == 'development';
+module.exports = function (app, config) {
+    app.set('views', config.root + '/app/views');
+    app.set('view engine', 'ejs');
 
-  // app.use(favicon(config.root + '/public/img/favicon.ico'));
-  app.use(logger('dev'));
-  app.use(bodyParser.json());
-  app.use(bodyParser.urlencoded({
-    extended: true
-  }));
-  app.use(cookieParser());
-  app.use(compress());
-  app.use(express.static(config.root + '/public'));
-  app.use(methodOverride());
+    var env = process.env.NODE_ENV || 'development';
+    app.locals.ENV = env;
+    app.locals.ENV_DEVELOPMENT = env == 'development';
 
-  var controllers = glob.sync(config.root + '/app/controllers/*.js');
-  controllers.forEach(function (controller) {
-    require(controller)(app);
-  });
+    // app.use(favicon(config.root + '/public/img/favicon.ico'));
+    app.use(logger('dev'));
+    app.use(bodyParser.json());
+    app.use(bodyParser.urlencoded({
+        extended: true
+    }));
+    app.use(cookieParser());
+    app.use(compress());
+    app.use(express.static(config.root + '/public'));
+    app.use(methodOverride());
 
-  app.use(function (req, res, next) {
-    var err = new Error('Not Found');
-    err.status = 404;
-    next(err);
-  });
-  
-  if(app.get('env') === 'development'){
-    app.use(function (err, req, res, next) {
-      res.status(err.status || 500);
-      res.render('error', {
-        message: err.message,
-        error: err,
-        title: 'error'
-      });
+    app.use(session({
+        secret: 'ghostX9'
+    }));
+    app.use(passport.initialize());
+    app.use(passport.session());
+
+    // read controllers for route
+    var controllers = glob.sync(config.root + '/app/controllers/*.js');
+    controllers.forEach(function (controller) {
+        require(controller)(app);
     });
-  }
 
-  app.use(function (err, req, res, next) {
-    res.status(err.status || 500);
-      res.render('error', {
-        message: err.message,
-        error: {},
-        title: 'error'
-      });
-  });
+    // catch 404 and forward to error handler
+    app.use(function (req, res, next) {
+        var err = new Error('Not Found');
+        err.status = 404;
+        next(err);
+    });
 
+    // development error handler
+    // will print stacktrace
+    if (app.get('env') === 'development') {
+        app.use(function (err, req, res, next) {
+            res.status(err.status || 500);
+            res.render('error', {
+                message: err.message,
+                error: err,
+                title: 'error'
+            });
+        });
+    }
+
+    // production error handler
+    // no stacktraces leaked to user
+    app.use(function (err, req, res, next) {
+        console.log('err', err);
+        res.status(err.status || 500);
+        res.render('error', {
+            message: err.message,
+            error: {},
+            title: 'error'
+        });
+    });
 };

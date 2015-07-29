@@ -1,22 +1,23 @@
-/* global require:false, __dirname:false */
+'use strict';
 
 var express = require('express');
 var config = require('./config/config');
 var glob = require('glob');
 var mongoose = require('mongoose');
-var fs = require("fs");
-var http = require('http');
+
 var Twit = require('twit');
-var util = require('util');
+var fs = require('fs');
+var passport = require('passport');
+var TwitterStrategy = require('passport-twitter').Strategy;
 
 mongoose.connect(config.db);
 var db = mongoose.connection;
-db.on('error', function() {
+db.on('error', function () {
     throw new Error('unable to connect to database at ' + config.db);
 });
 
 var models = glob.sync(config.root + '/app/models/*.js');
-models.forEach(function(model) {
+models.forEach(function (model) {
     require(model);
 });
 
@@ -24,146 +25,54 @@ var app = express();
 
 require('./config/express')(app, config);
 
-var server = app.listen(config.port);
+var filename = __dirname + '/config.json';
+var result = fs.readFileSync(filename);
+if (!result) {
+    throw new Error('Couldn"t read config file ' + filename);
+}
+var configTwitter = JSON.parse(result);
+console.log('Successfully read and parsed config file \n' + JSON.stringify(configTwitter, null, ' ') + '\n');
 
+var server = app.listen(config.port);
 var io = require('socket.io').listen(server);
-io.sockets.on('connection', function(socket) {
-    socket.on('msg', function(data) {
+
+/*
+io.sockets.on('connection', function (socket) {
+    socket.on('msg', function (data) {
         io.sockets.emit('msg', data);
     });
 });
+*/
+require('./app/lib/share').io = io;
 
-var Tweet = mongoose.model('Tweet');
-var User = mongoose.model('User');
-
-var filename = __dirname + "/config.json";
-var result = fs.readFileSync(filename);
-if (!result) {
-    throw new Error("Couldn't read config file " + filename);
-}
-var configTwitter = JSON.parse(result);
-console.log("Successfully read and parsed config file \n" + JSON.stringify(configTwitter, null, " ") + "\n");
-
-var T = new Twit(configTwitter);
-
-//
-// filter the public stream by english tweets containing `#apple`
-//
-var stream = T.stream('user', {
-    track: 'n_nishioka'
+passport.serializeUser(function (user, done) {
+    done(null, user);
 });
-//var stream = T.stream('statuses/filter', {
-//    track: 'Oculus',
-//    language: 'ja'
-//});
 
-var getImageBase64 = function(url, callback) {
-    // 1. Loading file from url:
-    http.get(url, function(res) { // url is the url of a PNG image.
-        var body = '';
-        res.setEncoding('binary');
-
-        res.on('data', function(chunk) {
-            if (res.statusCode === 200) body += chunk;
-        });
-
-        res.on('end', function(res) { // 2. When loaded, do:
-            //            console.log("1:Loaded response >>> " + body); // print-check xhr response 
-            var imgBase64 = new Buffer(body, 'binary').toString('base64'); // convert to base64
-            callback(imgBase64); //execute callback function with data
-        });
-    }).on('error', function(e) {
-        console.log(e.message); //エラー時
-    });
-};
-
-stream.on('tweet', function(tweet) {
-    if (typeof tweet.retweeted_status !== 'undefined') {
-        User.findOneAndUpdate({
-                id_str: tweet.retweeted_status.user.id_str
-            },
-            tweet.retweeted_status.user, {
-                new: true,
-                safe: true,
-                upsert: true
-            },
-            function(err, retweet_user) {
-                if (err) console.error(err);
-                tweet.retweeted_status.user = retweet_user._id;
-                Tweet.findOneAndUpdate({
-                        id_str: tweet.retweeted_status.id_str
-                    },
-                    tweet.retweeted_status, {
-                        new: true,
-                        safe: true,
-                        upsert: true
-                    },
-                    function(err, retweet) {
-                        if (err) console.error(err);
-                        User.findOneAndUpdate({
-                                id_str: tweet.user.id_str
-                            },
-                            tweet.user, {
-                                new: true,
-                                safe: true,
-                                upsert: true
-                            },
-                            function(err, user) {
-                                if (err) console.error(err);
-                                tweet.user = user._id;
-                                tweet.retweeted_status = retweet._id;
-                                Tweet.findOneAndUpdate({
-                                        id_str: tweet.id_str
-                                    },
-                                    tweet, {
-                                        new: true,
-                                        safe: true,
-                                        upsert: true
-                                    },
-                                    function(err, post) {
-                                        console.log('post: ', util.inspect(post, false, null));
-                                        if (err) console.error(err);
-                                        console.log(util.inspect(post, false, null));
-                                    }
-                                );
-                            }
-                        );
-                    }
-                );
-            }
-        );
-    }
-
-    //SVG DOM injection
-    getImageBase64(tweet.user.profile_image_url, function(encode) {
-        //console.log('data:image/png;base64,' + encode); // replace link by data URI
-        tweet.user.profile_image_url = 'data:image/png;base64,' + encode;
-        User.findOneAndUpdate({
-                id_str: tweet.user.id_str
-            },
-            tweet.user, {
-                new: true,
-                safe: true,
-                upsert: true
-            },
-            function(err, user) {
-                if (err) console.error(err);
-                tweet.user = user._id;
-                Tweet.findOneAndUpdate({
-                        id_str: tweet.id_str
-                    },
-                    tweet, {
-                        new: true,
-                        safe: true,
-                        upsert: true
-                    },
-                    function(err, post) {
-                        if (err) console.error(err);
-                        console.log(util.inspect(post, false, null));
-                    }
-                );
-            }
-        );
-        io.sockets.emit('msg', tweet);
-    });
+passport.deserializeUser(function (obj, done) {
+    done(null, obj);
 });
+
+passport.use(new TwitterStrategy({
+    consumerKey: configTwitter.consumer_key,
+    consumerSecret: configTwitter.consumer_secret,
+    callbackURL: "http://localhost:3000/auth/twitter/callback"
+}, function (token, tokenSecret, profile, done) {
+    configTwitter.access_token = token;
+    configTwitter.access_token_secret = tokenSecret;
+
+    console.log('Successfully OAuth\n' + JSON.stringify(configTwitter, null, ' ') + '\n');
+    console.log('profile', profile);
+
+    require('./app/lib/share').configTwitter = configTwitter;
+
+    var T = new Twit(configTwitter);
+
+    require('./app/lib/share').stream = T.stream('user', {
+        track: profile.username
+    });
+
+    return done(null,profile);
+}));
+
+module.exports = app;
