@@ -26,11 +26,18 @@ var app = express();
 require('./config/express')(app, config);
 
 var filename = __dirname + '/config.json';
-var result = fs.readFileSync(filename);
-if (!result) {
-    throw new Error('Couldn"t read config file ' + filename);
+var configTwitter;
+try {
+    var result = fs.readFileSync(filename);
+    configTwitter = JSON.parse(result);
+} catch (e) {
+    console.log('Could not read config file ' + filename);
+    console.log('env:', process.env);
+    configTwitter = {
+        consumer_key: process.env.TWITTER_CONSUMER_KEY,
+        consumer_secret: process.env.TWITTER_CONSUMER_SECRET
+    };
 }
-var configTwitter = JSON.parse(result);
 console.log('Successfully read and parsed config file \n' + JSON.stringify(configTwitter, null, ' ') + '\n');
 
 var server = app.listen(config.port);
