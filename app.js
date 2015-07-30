@@ -3,13 +3,14 @@
 var express = require('express');
 var config = require('./config/config');
 var glob = require('glob');
-var mongoose = require('mongoose');
+//var mongoose = require('mongoose');
 
 var Twit = require('twit');
 var fs = require('fs');
 var passport = require('passport');
 var TwitterStrategy = require('passport-twitter').Strategy;
 
+/*
 mongoose.connect(config.db);
 var db = mongoose.connection;
 db.on('error', function () {
@@ -20,6 +21,7 @@ var models = glob.sync(config.root + '/app/models/*.js');
 models.forEach(function (model) {
     require(model);
 });
+*/
 
 var app = express();
 
