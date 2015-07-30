@@ -8,7 +8,7 @@ var config = {
     app: {
       name: 'node-tweet-vr'
     },
-    port: 3000,
+    port: process.env.PORT || 3000,
     db: 'mongodb://localhost/node-tweet-vr-development'
   },
 
@@ -17,7 +17,7 @@ var config = {
     app: {
       name: 'node-tweet-vr'
     },
-    port: 3000,
+    port: process.env.PORT || 3000,
     db: 'mongodb://localhost/node-tweet-vr-test'
   },
 
@@ -26,7 +26,7 @@ var config = {
     app: {
       name: 'node-tweet-vr'
     },
-    port: 3000,
+    port: process.env.PORT || 3000,
     db: 'mongodb://localhost/node-tweet-vr-production'
   }
 };
