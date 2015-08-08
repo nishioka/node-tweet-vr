@@ -2,8 +2,10 @@
 
 var express = require('express');
 var config = require('./config/config');
-var glob = require('glob');
+//var glob = require('glob');
 //var mongoose = require('mongoose');
+
+var http = require('http');
 
 var Twit = require('twit');
 var fs = require('fs');
@@ -52,7 +54,7 @@ io.sockets.on('connection', function (socket) {
     });
 });
 */
-require('./app/lib/share').io = io;
+//require('./app/lib/share').io = io;
 
 passport.serializeUser(function (user, done) {
     done(null, user);
@@ -61,6 +63,28 @@ passport.serializeUser(function (user, done) {
 passport.deserializeUser(function (obj, done) {
     done(null, obj);
 });
+
+var getImageBase64 = function (url, callback) {
+    // 1. Loading file from url:
+    http.get(url, function (res) { // url is the url of a PNG image.
+        var body = '';
+        res.setEncoding('binary');
+
+        res.on('data', function (chunk) {
+            if (res.statusCode === 200) {
+                body += chunk;
+            }
+        });
+
+        res.on('end', function (res) { // 2. When loaded, do:
+            //console.log("1:Loaded response >>> " + body); // print-check xhr response 
+            var imgBase64 = new Buffer(body, 'binary').toString('base64'); // convert to base64
+            callback(imgBase64); //execute callback function with data
+        });
+    }).on('error', function (e) {
+        console.log(e.message); //エラー時
+    });
+};
 
 passport.use(new TwitterStrategy({
     consumerKey: configTwitter.consumer_key,
@@ -77,11 +101,37 @@ passport.use(new TwitterStrategy({
 
     var T = new Twit(configTwitter);
 
-    require('./app/lib/share').stream = T.stream('user', {
+    //require('./app/lib/share').stream = T.stream('user', {
+    var stream = T.stream('user', {
         track: profile.username
     });
+    //var io = require('../lib/share').io;
+    //var stream = require('../lib/share').stream;
 
-    return done(null,profile);
+    stream.on('tweet', function (tweet) {
+        //if (typeof tweet.retweeted_status === 'undefined') {
+        //    return;
+        //}
+        console.log(tweet.user.name + ':' + tweet.text);
+        //SVG DOM injection
+        getImageBase64(tweet.user.profile_image_url, function (encode) {
+            //console.log('data:image/png;base64,' + encode); // replace link by data URI
+            tweet.user.profile_image_url = 'data:image/png;base64,' + encode;
+            io.sockets.emit('msg', tweet);
+        });
+    });
+    stream.on('connect', function(request) {
+        console.log('stream connection attempted.');
+    });
+    stream.on('connected', function (res) {
+        console.log('stream connected (' + res.statusCode + ')');
+    });
+    stream.on('reconnect', function (req, res, interval) {
+        console.log('stream reconnecting in ' + interval + ' (' + res.statusCode + ')');
+    });
+
+
+    return done(null, profile);
 }));
 
 module.exports = app;

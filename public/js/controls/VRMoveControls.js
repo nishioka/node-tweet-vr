@@ -4,7 +4,8 @@
  * @author James Baicoianu / http://www.baicoianu.com/
  */
 
-THREE.VRFlyControls = function(object, domElement, callback) {
+THREE.VRMoveControls = function(object, domElement, callback) {
+    'use strict';
 
     this.object = object;
 
@@ -226,7 +227,7 @@ THREE.VRFlyControls = function(object, domElement, callback) {
         // game controller
         for (var j in this.controllers) {
             var controller = this.controllers[j];
-            /*
+
             for (var i = 0; i < controller.buttons.length; i++) {
                 var val = controller.buttons[i];
                 var pressed = val === 1.0;
@@ -235,10 +236,14 @@ THREE.VRFlyControls = function(object, domElement, callback) {
                     val = val.value;
                 }
                 if (pressed) {
-                    console.log('button(' + i + ') pressed');
+                    console.log('button(' + i + ') pressed, val = ', val);
+                    if (window.cursor.objectMouseOver) {
+                        console.log('objectMouseOver: ', window.cursor.objectMouseOver);
+                        window.cursor.objectMouseOver.dispatchEvent({ type: 'click'});
+                    }
                 }
             }
-            */
+
             if (controller.axes[1] > 0.5 || controller.axes[1] < -0.5) {
                 this.moveVector.z = controller.axes[1]; // forward/back
             }

@@ -2,21 +2,16 @@
     'use strict';
 
     var socket = io.connect();
-    $('form').submit(function () {
-        socket.emit('msg', $('input').val());
-        $('input').val('');
-        return false;
-    });
 
     var container;
 
-    var modeVR = false;
     var helper, axis, grid;
 
     var SVG_NS = 'http://www.w3.org/2000/svg';
     var XHTML_NS = 'http://www.w3.org/1999/xhtml';
     var XLINK_NS = 'http://www.w3.org/1999/xlink';
 
+    window.modeVR = false;
     window.objects = [];
 
     function addAxisGrid() {
@@ -41,7 +36,7 @@
     function animate() {
         TWEEN.update();
 
-        if (modeVR) {
+        if (window.modeVR) {
             // Update VR headset position and apply to camera.
             window.vrControl.update(5);
             // Render the scene through the VREffect.
@@ -52,32 +47,46 @@
         }
 
         window.cursor && window.cursor.update();
-        Arrows.update();
 
         // keep looping
         requestAnimationFrame(animate);
 
-        //視野の外に出たtweetを削除
-        /*
-        for (var i = 0; i < objects.length; ++i) {
-            objects[i].mesh.position.z += 1;
-            if (objects[i].mesh.position.z > 4000) {
-                scene.remove(objects[i].mesh);
-                objects[i].geometry.dispose();
-                objects[i].material.dispose();
-                objects[i].texture.dispose();
+    }
 
-                objects.splice(i, 1);
-            }
-        }
-        */
+    function pickup(object, duration) {
+        var target = new THREE.Vector3().copy(window.camera.position);
+        target.sub(object.position).multiplyScalar(-0.1).add(window.camera.position);
+        console.log('target', target);
+        var position = new TWEEN.Tween(object.position);
+        position.to({
+            x: target.x,
+            y: target.y,
+            z: target.z
+        }, duration * 2)
+        .easing(TWEEN.Easing.Exponential.InOut)
+        .start();
+
+        var release = new TWEEN.Tween();
+        release.to({}, duration * 2)
+        .onComplete(function() {
+            console.log('complete next: ', object, ' -> ', object.origine);
+            var back = new TWEEN.Tween(object.position);
+            back.to({
+                x: object.origine.x,
+                y: object.origine.y,
+                z: object.origine.z
+            }, duration * 2)
+            .easing(TWEEN.Easing.Exponential.InOut)
+            .start();
+        })
+        .start();
     }
 
     function onWindowResize() {
         window.camera.aspect = window.innerWidth / window.innerHeight;
         window.camera.updateProjectionMatrix();
 
-        if (modeVR) {
+        if (window.modeVR) {
             window.vrEffect.setSize(window.innerWidth, window.innerHeight);
         } else {
             window.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -123,6 +132,10 @@
         addAxisGrid();
         helper = true;
 
+        var light = new THREE.DirectionalLight(0xffffff);
+        light.position.set(1, 1, 1);
+        window.scene.add(light);
+
         // レンダーのセットアップ
         window.renderer = new THREE.WebGLRenderer({
             antialias: true
@@ -142,7 +155,7 @@
         container.appendChild(window.renderer.domElement);
 
         // for VR
-        window.vrControl = new THREE.VRFlyControls(window.camera);
+        window.vrControl = new THREE.VRMoveControls(window.camera);
 
         // for not VR
         window.mouseControl = new THREE.OrbitControls(window.camera, window.renderer.domElement);
@@ -169,16 +182,16 @@
 
         // ダブルクリックでfull-screen VR mode
         window.addEventListener('dblclick', function () {
-            modeVR = true;
+            window.modeVR = true;
             window.vrEffect.setFullScreen(true);
-            //window.cursor.setMode('centered'); //視線カーソル
-            window.cursor.setMode('hides');
+            window.cursor.setMode('centered'); // head tracking cursor
+            //window.cursor.setMode('hides');
         }, false);
 
         // full-screen VR modeからの復帰時の処理
         document.addEventListener('mozfullscreenchange', function () {
             if (document.mozFullScreenElement === null) {
-                modeVR = false;
+                window.modeVR = false;
                 window.cursor.setMode('mono');
             }
         });
@@ -287,22 +300,11 @@
                 mesh.position.x = Math.random() * 2000 - 1000;
                 mesh.position.y = Math.random() * 2000 - 1000;
                 mesh.position.z = Math.random() * 2000 - 1000;
-                //mesh.position.z = -2000;
+                mesh.origine = new THREE.Vector3().copy(mesh.position);
 
                 mesh.addEventListener('click', function (event) {
                     console.log('click', event.target.name + ' user:' + tweet.user.screen_name, this);
-/*
-                    if (this.clickMap) {
-                        this.setMap(this.clickMap);
-                    }
-
-                    this.clicked = true;
-
-                    if (this.options.onClick) {
-                        this.options.onClick(event);
-                    }
-*/
-
+                    pickup(this, 5000);
                 }, false);
 
                 mesh.addEventListener('mouseover', function (event) {
